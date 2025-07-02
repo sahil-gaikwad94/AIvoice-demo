@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice AI Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-bg: #0a0a0a;
+            --secondary-bg: #1a1a1a;
+            --card-bg: #111111;
+            --border-color: #2a2a2a;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --text-muted: #666666;
+            --accent-primary: #00d4ff;
+            --accent-secondary: #0099cc;
+            --accent-glow: rgba(0, 212, 255, 0.3);
+            --user-msg-bg: rgba(0, 212, 255, 0.1);
+            --ai-msg-bg: rgba(255, 255, 255, 0.05);
+            --success-color: #00ff88;
+            --error-color: #ff4757;
+            --glass-bg: rgba(17, 17, 17, 0.8);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, var(--primary-bg) 0%, #1a1a2e 50%, var(--primary-bg) 100%);
+            color: var(--text-primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(0, 212, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(0, 212, 255, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .ai-container {
+            width: 95%;
+            max-width: 700px;
+            height: 90vh;
+            max-height: 800px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 32px;
+            backdrop-filter: blur(20px);
+            box-shadow: 
+                0 25px 50px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .ai-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-primary), transparent);
+            opacity: 0.6;
+        }
+
+        .ai-header {
+            padding: 2rem 2rem 1.5rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border-color);
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.05) 0%, transparent 100%);
+            position: relative;
+        }
+
+        .ai-header h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent-primary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        .status-text {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            font-weight: 400;
+            min-height: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            transition: all 0.3s ease;
+        }
+
+        .status-text.listening .status-indicator {
+            background: var(--accent-primary);
+            box-shadow: 0 0 20px var(--accent-glow);
+            animation: pulse-dot 1.5s infinite;
+        }
+
+        .status-text.processing .status-indicator {
+            background: var(--success-color);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.7; }
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .transcript-container {
+            flex-grow: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.2rem;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-color) transparent;
+        }
+
+        .transcript-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .transcript-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .transcript-container::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        .transcript-container::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 1rem 1.25rem;
+            border-radius: 20px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            position: relative;
+            animation: messageSlideIn 0.3s ease-out;
+        }
+
+        @keyframes messageSlideIn {
+            from { 
+                opacity: 0; 
+                transform: translateY(20px) scale(0.95); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1); 
+            }
+        }
+
+        .message-header {
+            font-weight: 600;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+            opacity: 0.8;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .message-avatar {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .transcript-user {
+            align-self: flex-end;
+            background: var(--user-msg-bg);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            border-bottom-right-radius: 6px;
+        }
+
+        .transcript-user .message-avatar {
+            background: var(--accent-primary);
+            color: var(--primary-bg);
+        }
+
+        .transcript-ai {
+            align-self: flex-start;
+            background: var(--ai-msg-bg);
+            border: 1px solid var(--border-color);
+            border-bottom-left-radius: 6px;
+        }
+
+        .transcript-ai .message-avatar {
+            background: linear-gradient(135deg, var(--success-color), var(--accent-primary));
+            color: var(--primary-bg);
+        }
+
+        .transcript-system {
+            align-self: center;
+            background: rgba(255, 71, 87, 0.1);
+            border: 1px solid rgba(255, 71, 87, 0.2);
+            color: var(--error-color);
+            max-width: 90%;
+            text-align: center;
+            font-size: 0.85rem;
+        }
+
+        .ai-footer {
+            padding: 2rem;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.3) 100%);
+            position: relative;
+        }
+
+        .talk-button {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: var(--primary-bg);
+            border: none;
+            border-radius: 50%;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            box-shadow: 
+                0 10px 30px rgba(0, 212, 255, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .talk-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.1) 50%, transparent 100%);
+            transform: translateX(-100%);
+            transition: transform 0.6s ease;
+        }
+
+        .talk-button:hover::before {
+            transform: translateX(100%);
+        }
+
+        .talk-button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 
+                0 15px 40px rgba(0, 212, 255, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .talk-button:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+
+        .talk-button:disabled {
+            background: var(--text-muted);
+            cursor: not-allowed;
+            opacity: 0.5;
+            box-shadow: none;
+        }
+
+        .mic-icon {
+            width: 28px;
+            height: 28px;
+            transition: all 0.3s ease;
+        }
+
+        .button-text {
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.25rem;
+        }
+
+        .talk-button.processing .mic-icon {
+            animation: float 2s ease-in-out infinite;
+        }
+
+        .talk-button.listening .mic-icon {
+            animation: pulse 1.5s ease-in-out infinite;
+            filter: drop-shadow(0 0 10px rgba(0, 212, 255, 0.8));
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .controls-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-badges {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-online {
+            background: rgba(0, 255, 136, 0.2);
+            color: var(--success-color);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+        }
+
+        .badge-offline {
+            background: rgba(255, 71, 87, 0.2);
+            color: var(--error-color);
+            border: 1px solid rgba(255, 71, 87, 0.3);
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 0;
+                align-items: stretch;
+            }
+            
+            .ai-container {
+                width: 100%;
+                height: 100vh;
+                max-height: none;
+                border-radius: 0;
+                border: none;
+            }
+
+            .ai-header {
+                padding: 1.5rem 1rem 1rem;
+            }
+
+            .ai-header h1 {
+                font-size: 1.8rem;
+            }
+
+            .transcript-container {
+                padding: 1rem;
+            }
+
+            .message {
+                max-width: 90%;
+            }
+
+            .ai-footer {
+                padding: 1.5rem;
+            }
+
+            .talk-button {
+                width: 70px;
+                height: 70px;
+            }
+
+            .controls-info {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="ai-container">
+        <header class="ai-header">
+            <h1>Voice AI Assistant</h1>
+            <p id="status" class="status-text">
+                <span class="status-indicator"></span>
+                Click the button and start speaking
+            </p>
+            <div class="status-badges">
+                <span class="badge badge-online" id="speech-badge">Speech Ready</span>
+                <span class="badge badge-online" id="ai-badge">AI Connected</span>
+            </div>
+        </header>
+
+        <div id="transcript-container" class="transcript-container">
+            <div class="message transcript-ai">
+                <div class="message-header">
+                    <div class="message-avatar">AI</div>
+                    Assistant
+                </div>
+                Hello! I'm your AI voice assistant. Click the microphone button below and start speaking to have a conversation with me.
+            </div>
+        </div>
+
+        <footer class="ai-footer">
+            <button id="talk-button" class="talk-button">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="mic-icon">
+                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                    <line x1="12" y1="19" x2="12" y2="22"></line>
+                </svg>
+                <span class="button-text">Talk</span>
+            </button>
+            
+            <div class="controls-info">
+                <div class="control-item">
+                    <span>🎤</span>
+                    <span>Voice Input</span>
+                </div>
+                <div class="control-item">
+                    <span>🤖</span>
+                    <span>AI Response</span>
+                </div>
+                <div class="control-item">
+                    <span>🔊</span>
+                    <span>Voice Output</span>
+                </div>
+            </div>
+        </footer>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const GEMINI_API_KEY = 'AIzaSyCz2Yu3BVfHfw5aTxCcRegEvjHE1i1ZqoM';
+            const AIRTABLE_API_KEY = 'patSBnMpKEGWpEhC8.7d44c0acb8b592aa13f1335ad841a833c21e453a5e869bfe922d77b5f19d4badE';
+            const AIRTABLE_BASE_ID = 'I2S6LZBin7cjDB';
+            const AIRTABLE_TABLE_NAME = 'Logs';
+
+            const talkButton = document.getElementById('talk-button');
+            const statusElement = document.getElementById('status');
+            const transcriptContainer = document.getElementById('transcript-container');
+            const speechBadge = document.getElementById('speech-badge');
+            const aiBadge = document.getElementById('ai-badge');
+
+            let isProcessing = false;
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                updateStatus('Speech recognition not supported in this browser.', 'error');
+                talkButton.disabled = true;
+                speechBadge.textContent = 'Speech Unavailable';
+                speechBadge.className = 'badge badge-offline';
+                return;
+            }
+
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            const updateStatus = (text, type = 'default') => {
+                const indicator = statusElement.querySelector('.status-indicator');
+                const textSpan = statusElement.childNodes[2] || statusElement;
+                
+                // Update text
+                if (textSpan.nodeType === Node.TEXT_NODE) {
+                    textSpan.textContent = text;
+                } else {
+                    statusElement.innerHTML = `<span class="status-indicator"></span>${text}`;
+                }
+                
+                // Update classes for animation
+                statusElement.className = `status-text ${type}`;
+            };
+
+            const addMessageToTranscript = (sender, message, type = 'normal') => {
+                const messageElement = document.createElement('div');
+                const senderClass = sender === 'You' ? 'transcript-user' : 
+                                  sender === 'System' ? 'transcript-system' : 'transcript-ai';
+                
+                messageElement.classList.add('message', senderClass);
+                
+                if (sender !== 'System') {
+                    const avatar = sender === 'You' ? 'U' : 'AI';
+                    messageElement.innerHTML = `
+                        <div class="message-header">
+                            <div class="message-avatar">${avatar}</div>
+                            ${sender}
+                        </div>
+                        ${message}
+                    `;
+                } else {
+                    messageElement.innerHTML = message;
+                }
+                
+                transcriptContainer.appendChild(messageElement);
+                transcriptContainer.scrollTop = transcriptContainer.scrollHeight;
+            };
+
+            const toggleProcessing = (state) => {
+                isProcessing = state;
+                talkButton.disabled = state;
+                const buttonText = talkButton.querySelector('.button-text');
+                
+                if (state) {
+                    buttonText.textContent = 'Processing';
+                    talkButton.classList.add('processing');
+                } else {
+                    buttonText.textContent = 'Talk';
+                    talkButton.classList.remove('processing', 'listening');
+                    updateStatus('Click the button and start speaking');
+                }
+            };
+
+            talkButton.addEventListener('click', () => {
+                if (isProcessing) return;
+                recognition.start();
+            });
+
+            recognition.onstart = () => {
+                updateStatus('Listening... Speak now', 'listening');
+                talkButton.disabled = true;
+                talkButton.classList.add('listening');
+                const buttonText = talkButton.querySelector('.button-text');
+                buttonText.textContent = 'Listening';
+            };
+
+            recognition.onresult = async (event) => {
+                const userInput = event.results[0][0].transcript;
+                addMessageToTranscript('You', userInput);
+                toggleProcessing(true);
+                updateStatus('AI is thinking...', 'processing');
+
+                try {
+                    const aiResponse = await getGeminiResponse(userInput);
+                    updateStatus('Speaking response...', 'processing');
+                    speak(aiResponse, () => {
+                        logToAirtable(userInput, aiResponse);
+                        toggleProcessing(false);
+                    });
+                    addMessageToTranscript('AI', aiResponse);
+                } catch (error) {
+                    console.error('Error getting AI response:', error);
+                    updateStatus(`Error: ${error.message}`, 'error');
+                    addMessageToTranscript('System', `⚠️ Sorry, I couldn't get a response. ${error.message}`);
+                    toggleProcessing(false);
+                }
+            };
+
+            recognition.onerror = (event) => {
+                let errorMessage = `Speech recognition error: ${event.error}`;
+                if (event.error === 'not-allowed') {
+                    errorMessage = 'Microphone access denied. Please allow microphone permissions.';
+                } else if (event.error === 'no-speech') {
+                    errorMessage = 'No speech detected. Please try again.';
+                }
+                updateStatus(errorMessage, 'error');
+                addMessageToTranscript('System', `🎤 ${errorMessage}`);
+                toggleProcessing(false);
+            };
+
+            recognition.onend = () => {
+                if (!isProcessing) {
+                    toggleProcessing(false);
+                }
+            };
+
+            const getGeminiResponse = async (text) => {
+                if (GEMINI_API_KEY === 'PASTE_YOUR_GEMINI_API_KEY_HERE') {
+                    throw new Error('Gemini API key not configured.');
+                }
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+                const requestBody = {
+                    contents: [{
+                        parts: [{ text: text }]
+                    }]
+                };
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    aiBadge.textContent = 'AI Error';
+                    aiBadge.className = 'badge badge-offline';
+                    throw new Error(`Gemini API Error: ${errorData.error.message}`);
+                }
+
+                const data = await response.json();
+                if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts[0]) {
+                     throw new Error('Invalid response structure from Gemini API.');
+                }
+
+                return data.candidates[0].content.parts[0].text;
+            };
+            
+            const speak = (text, onEndCallback) => {
+                if (!window.speechSynthesis) {
+                    updateStatus('Speech synthesis not supported.', 'error');
+                    if(onEndCallback) onEndCallback();
+                    return;
+                }
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.rate = 1;
+                utterance.pitch = 1;
+
+                utterance.onend = () => {
+                    if(onEndCallback) onEndCallback();
+                };
+
+                utterance.onerror = (event) => {
+                    console.error('Speech synthesis error:', event.error);
+                    updateStatus('Sorry, I couldn\'t speak the response.', 'error');
+                    if(onEndCallback) onEndCallback();
+                };
+                
+                speechSynthesis.speak(utterance);
+            };
+
+            const logToAirtable = async (userInput, aiResponse) => {
+                if (AIRTABLE_API_KEY === 'PASTE_YOUR_AIRTABLE_API_KEY_HERE' || AIRTABLE_BASE_ID === 'PASTE_YOUR_AIRTABLE_BASE_ID_HERE') {
+                    console.warn('Airtable credentials not configured. Skipping log.');
+                    return;
+                }
+                const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_NAME}`;
+                const requestBody = {
+                    records: [{
+                        fields: {
+                            UserInput: userInput,
+                            AIResponse: aiResponse,
+                        },
+                    }, ],
+                };
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(requestBody),
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(`Airtable API Error: ${errorData.error.message || response.statusText}`);
+                    }
+                    console.log('Successfully logged to Airtable.');
+                } catch (error) {
+                    console.error('Error logging to Airtable:', error);
+                    addMessageToTranscript('System', '📝 Failed to log conversation.');
+                }
+            };
+        });
+    </script>
+</body>
+</html>
